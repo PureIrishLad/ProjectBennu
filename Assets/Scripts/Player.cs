@@ -10,6 +10,8 @@ public class Player : MonoBehaviour
 
     [HideInInspector]
     public Vector2Int chunkPos = Vector2Int.zero;
+    [HideInInspector]
+    public Vector2Int sectorPos = Vector2Int.zero;
 
     private float speed = 5f;
     private World world;
@@ -21,7 +23,7 @@ public class Player : MonoBehaviour
         world = GameObject.FindGameObjectWithTag("World").GetComponent<World>();
         Cursor.lockState = CursorLockMode.Locked;
         
-        chunkSize = world.chunkSize.x;
+        chunkSize = World.chunkSize.x;
     }
 
     private void Update()
