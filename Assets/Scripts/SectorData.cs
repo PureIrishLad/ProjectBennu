@@ -5,51 +5,59 @@ using UnityEngine;
 [System.Serializable]
 public class SectorData 
 {
-    public ChunkData[,] chunks;
-    public int sectorPosX;
-    public int sectorPosY;
+    [SerializeField] public string[] chunks;
+    [SerializeField] public int sectorPosX;
+    [SerializeField] public int sectorPosY;
 
     public SectorData(Chunk[,] chunks, Vector2Int sectorPos)
     {
-        this.chunks = GetChunkData(chunks);
-        this.sectorPosX = sectorPos.x;
-        this.sectorPosY = sectorPos.y;
+        GetChunkData(chunks);
+        sectorPosX = sectorPos.x;
+        sectorPosY = sectorPos.y;
     }
 
-    public static ChunkData[,] GetChunkData(Chunk[,] chunks)
+    public void GetChunkData(Chunk[,] chunksRaw)
     {
-        ChunkData[,] cd = new ChunkData[World.sectorSize, World.sectorSize];
+        int width = World.sectorSize;
+        
+        chunks = new string[width * width];
 
-        for (int x = 0; x < World.sectorSize; x++)
+        for (int x = 0; x < width; x++)
         {
-            for (int y = 0; y < World.sectorSize; y++)
+            int i = x * width;
+            for (int y = 0; y < width; y++)
             {
-                if (chunks[x, y] == null) continue;
-                cd[x, y] = new ChunkData(chunks[x, y].data, chunks[x, y].chunkPos);
+                Chunk raw = chunksRaw[x, y];
+                if (raw == null) continue;
+                chunks[i + y] = ChunkData.Compress(raw.data);
             }
         }
-
-        return cd;
     }
 
-    public static Chunk[,] GetChunkFromData(ChunkData[,] cs, Sector sector)
+    public void Decompress(Sector s)
     {
-        Chunk[,] chunks = new Chunk[World.sectorSize, World.sectorSize];
-        for (int x = 0; x < World.sectorSize; x++)
-        {
-            for (int y = 0; y < World.sectorSize; y++)
-            {
-                if (cs[x, y] == null) continue;
-                Chunk c = Object.Instantiate(World.chunkPrefabS).GetComponent<Chunk>();
-                c.generate = false;
-                c.chunkPos = new Vector2Int(cs[x, y].chunkPosX, cs[x, y].chunkPosY);
-                c.sectorPos = sector.sectorPos;
-                c.sector = sector;
+        int width = World.sectorSize;
+        int height = World.sectorSize;
 
-                chunks[x, y] = c;
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                string cdc = this.chunks[x * height + y];
+                if (cdc == null) continue;
+                Chunk c = new Chunk();
+
+                c.data = ChunkData.Decompress(cdc);
+
+                c.chunkPos = new Vector2Int(x + s.sectorPos.x * World.sectorSize, y + s.sectorPos.y * World.sectorSize);
+                c.sectorPos = new Vector2Int(sectorPosX, sectorPosY);
+                c.chunkSectorPos = s.ChunkSectorPos(c.chunkPos);
+                c.isGenerated = true;
+                c.sector = s;
+                c.meshGenerated = false;
+
+                s.chunks[x, y] = c;
             }
         }
-
-        return chunks;
     }
 }

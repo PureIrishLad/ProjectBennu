@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using SimplexNoise;
 using System.Threading;
+using System;
 
-public class Chunk : MonoBehaviour
+public class Chunk
 {
     [HideInInspector]
     public Mesh mesh; // Chunks mesh
@@ -13,6 +14,8 @@ public class Chunk : MonoBehaviour
     public Vector2Int sectorPos;
     public Vector2Int chunkSectorPos;
     public Sector sector;
+
+    public GameObject chunkObject;
 
     private World world; // Reference to world
     public byte[,,] data; // Chunk data
@@ -46,31 +49,34 @@ public class Chunk : MonoBehaviour
     private List<Vector2> uvs = new List<Vector2>();
     private List<int> indices = new List<int>();
 
-    public bool generate = true;
-
     private float yBias;
+
+    public bool meshGenerated = true;
 
     [HideInInspector]
     public bool isGenerated; // True if the chunk data has been generated
 
-    // Generates the chunk data
-    public IEnumerator GenerateChunk()
+    public void InitChunk()
     {
         world = GameObject.FindGameObjectWithTag("World").GetComponent<World>();
         width = World.chunkSize.x;
         height = World.chunkSize.y;
         worldSize = World.worldSizeChunks;
         offset = new Vector3Int(chunkPos.x, 0, chunkPos.y) * width;
-        data = new byte[width, height, width];
         scale = world.noiseScale;
         mesh = new Mesh();
-        meshFilter = GetComponent<MeshFilter>();
+        meshFilter = chunkObject.GetComponent<MeshFilter>();
         meshFilter.mesh = mesh;
-        transform.position = offset;
+        chunkObject.transform.position = offset;
         yBias = world.asteroidYBias;
+    }
 
-        if (generate)
-            ThreadPool.QueueUserWorkItem(new WaitCallback(GenerateChunkData));
+    // Generates the chunk data
+    public IEnumerator GenerateChunk()
+    {
+        data = new byte[width, height, width];
+
+        ThreadPool.QueueUserWorkItem(new WaitCallback(GenerateChunkData));
 
         isGenerated = true;
 
@@ -78,7 +84,7 @@ public class Chunk : MonoBehaviour
     }
 
     // Generates chunk mesh
-    public IEnumerator GenerateMesh()
+    public void GenerateMesh()
     {
         mesh.Clear();
 
@@ -91,7 +97,7 @@ public class Chunk : MonoBehaviour
         mesh.RecalculateBounds();
         mesh.RecalculateNormals();
 
-        yield return null;
+        //yield return null;
     }
 
     // Tests the given block position to see which faces can be drawn
@@ -118,20 +124,20 @@ public class Chunk : MonoBehaviour
         Sector fSector = world.GetSector(fSectorPos);
         Sector bSector = world.GetSector(bSectorPos);
 
-        Vector2Int lChunkPos = lSector.ChunkSectorPos(new Vector2Int(chunkPos.x - 1, chunkPos.y));
-        Vector2Int rChunkPos = lSector.ChunkSectorPos(new Vector2Int(chunkPos.x + 1, chunkPos.y));
-        Vector2Int fChunkPos = lSector.ChunkSectorPos(new Vector2Int(chunkPos.x, chunkPos.y + 1));
-        Vector2Int bChunkPos = lSector.ChunkSectorPos(new Vector2Int(chunkPos.x, chunkPos.y - 1));
+        Vector2Int lChunkPos = lSector != null ? lSector.ChunkSectorPos(new Vector2Int(chunkPos.x - 1, chunkPos.y)) : Vector2Int.zero;
+        Vector2Int rChunkPos = rSector != null ? rSector.ChunkSectorPos(new Vector2Int(chunkPos.x + 1, chunkPos.y)) : Vector2Int.zero;
+        Vector2Int fChunkPos = fSector != null ? fSector.ChunkSectorPos(new Vector2Int(chunkPos.x, chunkPos.y + 1)) : Vector2Int.zero;
+        Vector2Int bChunkPos = bSector != null ? bSector.ChunkSectorPos(new Vector2Int(chunkPos.x, chunkPos.y - 1)) : Vector2Int.zero;
 
         Chunk lChunk = lSector != null ? lSector.chunks[lChunkPos.x, lChunkPos.y] : null;
         Chunk rChunk = rSector != null ? rSector.chunks[rChunkPos.x, rChunkPos.y] : null;
         Chunk fChunk = fSector != null ? fSector.chunks[fChunkPos.x, fChunkPos.y] : null;
         Chunk bChunk = bSector != null ? bSector.chunks[bChunkPos.x, bChunkPos.y] : null;
 
-        byte bBlock = back.z >= 0 && data[back.x, back.y, back.z] == 0 || back.z < 0 && bChunk && bChunk.TestChunk(back) ? (byte)0x01 : (byte)0;
-        byte fBlock = forward.z < width && data[forward.x, forward.y, forward.z] == 0|| forward.z == width && fChunk && fChunk.TestChunk(forward) ? (byte)0x02 : (byte)0;
-        byte lBlock = left.x >= 0 && data[left.x, left.y, left.z] == 0 || left.x < 0 && lChunk && lChunk.TestChunk(left) ? (byte)0x04 : (byte)0;
-        byte rBlock = right.x < width && data[right.x, right.y, right.z] == 0 || right.x == width && rChunk && rChunk.TestChunk(right) ? (byte)0x08 : (byte)0;
+        byte bBlock = back.z >= 0 && data[back.x, back.y, back.z] == 0 || back.z < 0 && bChunk != null && bChunk.TestChunk(back) ? (byte)0x01 : (byte)0;
+        byte fBlock = forward.z < width && data[forward.x, forward.y, forward.z] == 0|| forward.z == width && fChunk != null && fChunk.TestChunk(forward) ? (byte)0x02 : (byte)0;
+        byte lBlock = left.x >= 0 && data[left.x, left.y, left.z] == 0 || left.x < 0 && lChunk != null && lChunk.TestChunk(left) ? (byte)0x04 : (byte)0;
+        byte rBlock = right.x < width && data[right.x, right.y, right.z] == 0 || right.x == width && rChunk != null && rChunk.TestChunk(right) ? (byte)0x08 : (byte)0;
         byte uBlock = up.y < height && data[up.x, up.y, up.z] == 0 || up.y == height ? (byte)0x10 : (byte)0;
         byte dBlock = down.y >= 0 && data[down.x, down.y, down.z] == 0 || down.y < 0 ? (byte)0x20 : (byte)0;
 
@@ -141,7 +147,7 @@ public class Chunk : MonoBehaviour
     }
     public bool TestChunk(Vector3Int pos)
     {
-        Vector3Int localPos = new Vector3Int(Utility.Modulo(pos.x, width), pos.y, Utility.Modulo(pos.z, width));
+        Vector3Int localPos = new Vector3Int(Utility.Modulo(pos.x, World.chunkSize.x), pos.y, Utility.Modulo(pos.z, World.chunkSize.x));
 
         return data[localPos.x, localPos.y, localPos.z] == 0;
     }
@@ -158,13 +164,15 @@ public class Chunk : MonoBehaviour
                 if (chunkPos.x == -1 || chunkPos.y == -1 || chunkPos.x == worldSize || chunkPos.y == worldSize) continue;
 
                 Sector sector = world.GetSector(sectorPos);
+                if (sector == null) continue;
+
                 Vector2Int chunkSectorPos = sector.ChunkSectorPos(chunkPos);
                 Chunk chunk = sector.chunks[chunkSectorPos.x, chunkSectorPos.y];
 
                 if (world.generatingChunks.Contains(chunk)) continue;
 
-                if (chunk)
-                    StartCoroutine(chunk.GenerateMesh());
+                if (chunk != null && chunk.chunkObject != null)
+                    chunk.GenerateMesh();
             }
         }
     }
@@ -365,14 +373,91 @@ public class Chunk : MonoBehaviour
 [System.Serializable]
 public class ChunkData
 {
-    public byte[,,] data;
-    public int chunkPosX;
-    public int chunkPosY;
+    public string compressed;
 
-    public ChunkData(byte[,,] data, Vector2Int chunkPos)
+    public ChunkData(byte[,,] data)
     {
-        this.data = data;
-        chunkPosX = chunkPos.x;
-        chunkPosY = chunkPos.y;
+        compressed = Compress(data);
+    }
+
+    public static string Compress(byte[,,] data)
+    {
+        byte current = data[0, 0, 0];
+        int num = 0;
+        string compressed = "";
+
+        int width = World.chunkSize.x;
+        int height = World.chunkSize.y;
+
+        int w1 = width - 1;
+        int h1 = height - 1;
+
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                for (int z = 0; z < width; z++)
+                {
+                    byte blockID = data[x, y, z];
+                    if (blockID != current)
+                    {
+                        compressed += current + "," + num.ToString("X") + ",";
+                        current = blockID;
+                        num = 1;
+                        continue;
+                    }
+
+                    num++;
+
+                    if (x == w1 && y == h1 && z == w1)
+                        compressed += blockID + "," + num.ToString("X");
+                }
+            }
+        }
+
+        return compressed;
+    }
+
+    public static byte[,,] Decompress(string compressed)
+    {
+        byte width = (byte)World.chunkSize.x;
+        int height = World.chunkSize.y;
+        byte[,,] data = new byte[width, height, width];
+
+        string[] csv = compressed.Split(',');
+        byte blockID = byte.Parse(csv[0]);
+        int num = int.Parse(csv[1], System.Globalization.NumberStyles.HexNumber);
+
+        int iter = 0;
+        int wh = width * height;
+        int end = width * wh;
+        for (int i = 0; i < end; i++)
+        {
+            if (num == 0)
+            {
+                iter += 2;
+
+                if (iter >= csv.Length - 1) break;
+
+                blockID = byte.Parse(csv[iter]);
+                num = int.Parse(csv[iter + 1], System.Globalization.NumberStyles.HexNumber);
+
+                if (blockID == 0)
+                {
+                    i += num - 1;
+                    num = 0;
+                    continue;
+                }
+            }
+
+            float xr = i / (float)wh;
+            byte x = (byte)xr;
+            byte z = Utility.ModuloB(i, width);
+            byte y = (byte)((xr - x) * height);
+
+            data[x, y, z] = blockID;
+            num--;
+        }
+        return data;
     }
 }

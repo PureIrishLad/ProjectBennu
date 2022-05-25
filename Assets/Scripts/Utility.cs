@@ -15,4 +15,9 @@ public static class Utility
         float r = n % m;
         return r < 0 ? r + m : r;
     }
+
+    public static byte ModuloB(int n, byte m)
+    {
+        return (byte)(n % m);
+    }
 }

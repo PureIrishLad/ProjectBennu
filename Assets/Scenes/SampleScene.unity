@@ -152,12 +152,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b178011c98515e4b9df79b572e5a787, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  worldSize: 64
-  chunkSize: {x: 16, y: 256}
-  renderDistance: 24
+  renderDistance: 16
   noiseScale: 0.025
   chunkPrefab: {fileID: 1012426361099789162, guid: 15c5ae4ce9b88e84aaed26acdf16f15e, type: 3}
   asteroidYBias: 128
+  sectors: []
   generatingChunks: []
 --- !u!4 &79668093
 Transform:
@@ -206,6 +205,7 @@ MonoBehaviour:
   minspeed: 15
   sensitivity: 3
   chunkPos: {x: 0, y: 0}
+  sectorPos: {x: 0, y: 0}
 --- !u!4 &587900975
 Transform:
   m_ObjectHideFlags: 0

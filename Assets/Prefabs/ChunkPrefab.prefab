@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 1012426361099789158}
   - component: {fileID: 1012426361099789157}
   - component: {fileID: 1012426361099789156}
-  - component: {fileID: 1012426361099789163}
   m_Layer: 0
   m_Name: ChunkPrefab
   m_TagString: Chunk
@@ -60,7 +59,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: da82c1b5444bfc54c8b8e805838b0df6, type: 2}
+  - {fileID: 2100000, guid: 57ff8af5908fcbb449a5f65461372aea, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -82,18 +81,3 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &1012426361099789163
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1012426361099789162}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6f1041895628789449ea35833c0aee63, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  mesh: {fileID: 0}
-  chunkPos: {x: 0, y: 0}
-  isGenerated: 0
