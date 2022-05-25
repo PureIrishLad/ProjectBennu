@@ -72,15 +72,13 @@ public class Chunk
     }
 
     // Generates the chunk data
-    public IEnumerator GenerateChunk()
+    public void GenerateChunk(object obj)
     {
         data = new byte[width, height, width];
 
-        ThreadPool.QueueUserWorkItem(new WaitCallback(GenerateChunkData));
+        GenerateChunkData(obj);
 
         isGenerated = true;
-
-        yield return null;
     }
 
     // Generates chunk mesh

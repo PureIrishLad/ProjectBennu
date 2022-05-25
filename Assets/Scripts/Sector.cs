@@ -36,7 +36,9 @@ public class Sector
 
             Vector2Int csp = ChunkSectorPos(chunkPos);
             Chunk chunk = chunks[csp.x, csp.y];
-            
+
+            if (chunk == null) continue;
+
             chunk.chunkObject = go;
             chunk.InitChunk();
             chunk.GenerateMesh();

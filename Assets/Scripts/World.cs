@@ -32,21 +32,26 @@ public class World : MonoBehaviour
     [HideInInspector]
     public List<Chunk> generatingChunks = new List<Chunk>();
 
+    private int targetFrameRate = 300;
+
     private void Awake()
     {
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = targetFrameRate;
+
         SimplexNoise.Noise.Seed = Random.Range(0, 1000000);
         player = GameObject.FindGameObjectWithTag("Player").GetComponent<Player>();
 
         player.sectorPos = new Vector2Int(worldSizeSectors / 2, worldSizeSectors / 2);
         player.chunkPos = player.sectorPos * sectorSize;
-        playerPrevPos = player.chunkPos;
+        //playerPrevPos = player.chunkPos;
         player.transform.position = new Vector3(player.chunkPos.x * chunkSize.x, chunkSize.y / 2, player.chunkPos.y * chunkSize.x);
 
         int threads = System.Environment.ProcessorCount;
         chunkPrefabS = chunkPrefab;
         ThreadPool.SetMaxThreads(threads, threads);
 
-        InitialGenerateWorld();
+        //InitialGenerateWorld();
     }
 
     private void Update()
@@ -133,7 +138,7 @@ public class World : MonoBehaviour
                 thisSector.chunks[chunk.chunkSectorPos.x, chunk.chunkSectorPos.y] = chunk;
 
                 chunk.InitChunk();
-                StartCoroutine(chunk.GenerateChunk());
+                ThreadPool.QueueUserWorkItem(new WaitCallback(chunk.GenerateChunk));
             }
         }
 
@@ -257,7 +262,7 @@ public class World : MonoBehaviour
                     thisSector.chunks[chunk.chunkSectorPos.x, chunk.chunkSectorPos.y] = chunk;
 
                     chunk.InitChunk();
-                    StartCoroutine(chunk.GenerateChunk());
+                    ThreadPool.QueueUserWorkItem(new WaitCallback(chunk.GenerateChunk));
                 }
             } 
         }
