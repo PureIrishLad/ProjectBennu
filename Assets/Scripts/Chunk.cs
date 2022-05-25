@@ -177,18 +177,23 @@ public class Chunk
 
     private void GenerateChunkData(object thread)
     {
-        for (int x = 0; x < width; x++)
+        float bval = 241f / 255f;
+        float bval2 = 14f / 255f;
+        for (int y = 0; y < height; y++)
         {
-            for (int y = 0; y < height; y++)
+            float bias = 1 - (Mathf.Abs(yBias - y) / yBias);
+            float bias2 = bval + bval2 * bias;
+            for (int x = 0; x < width; x++)
             {
                 for (int z = 0; z < width; z++)
                 {
                     float value = Noise.CalcPixel3D(x + offset.x, y, z + offset.z, scale);
-                    float bias = 1 - Mathf.Abs(yBias - y) * 0.0008593f;
-                    value *= bias;
+
+                    value *= bias2;
 
                     data[x, y, z] = value >= 241 ? (byte)1 : (byte)0;
                 }
+
             }
         }
     }
