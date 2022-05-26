@@ -8,6 +8,7 @@ public class World : MonoBehaviour
     public static int worldSizeSectors = 12;
     public static int sectorSize = 64; // The size of each sector in chunks
     public static int worldSizeChunks = worldSizeSectors * sectorSize;
+    public static int worldSizeBlocks = worldSizeChunks * chunkSize.x;
     public static Vector2Int chunkSize = new Vector2Int(16, 256); // The size of a chunk
     public int renderDistance; // The players render distance
 
@@ -30,7 +31,6 @@ public class World : MonoBehaviour
     // Contains all active chunks
     private List<Chunk> activeChunks = new List<Chunk>();
     [HideInInspector]
-    public List<Chunk> generatingChunks = new List<Chunk>();
 
     private int targetFrameRate = 300;
 
@@ -59,7 +59,12 @@ public class World : MonoBehaviour
         for (int i = 0; i < deleting.Count; i++)
         {
             if (deleting[i].deleted)
+            {
+                foreach (Chunk chunk in deleting[i].chunks)
+                    if (chunk != null)
+                        Destroy(chunk.chunkObject);
                 deleting.RemoveAt(i);
+            }
         }
 
         for (int i = 0; i < loading.Count; i++)
@@ -81,88 +86,6 @@ public class World : MonoBehaviour
         playerPrevPos = playerPos;
     }
 
-    // The initial call when generating the world
-    private void InitialGenerateWorld()
-    {
-        playerPos = player.chunkPos;
-
-        // Generating chunk data for all chunks in players render distance
-        for (int x = -renderDistance + 1; x < renderDistance; x++)
-        {
-            for (int z = -renderDistance + 1; z < renderDistance; z++)
-            {
-                Vector2Int chunkPos = new Vector2Int(x, z) + playerPos;
-                Vector2Int sectorPos = GetSectorPos(chunkPos);
-
-                if (sectorPos.x < 0 || sectorPos.x >= worldSizeSectors || sectorPos.y < 0 || sectorPos.y >= worldSizeSectors || Vector2Int.Distance(chunkPos, playerPos) > renderDistance) continue;
-
-                Sector thisSector = GetSector(sectorPos);
-
-                if (thisSector == null)
-                {
-                    if (!SaveSector.FileExists(sectorPos))
-                    {
-                        thisSector = new Sector(sectorPos, sectorSize);
-                        sectors.Add(thisSector);
-                    }
-                    else if (!ContainsSector(loading, sectorPos))
-                    {
-                        thisSector = new Sector(sectorPos, sectorSize);
-                        thisSector.toLoad.Add(chunkPos);
-                        ThreadPool.QueueUserWorkItem(new WaitCallback(thisSector.Load));
-                        loading.Add(thisSector);
-                        continue;
-                    }
-                }
-
-                if (ContainsSector(loading, sectorPos, out Sector s))
-                {
-                    s.toLoad.Add(chunkPos);
-                    continue;
-                }
-
-                Chunk chunk = GetChunkFromSector(thisSector, chunkPos);
-                GameObject go = GameObject.Instantiate(chunkPrefab);
-
-                chunk = new Chunk();
-                chunk.chunkObject = go;
-
-                activeChunks.Add(chunk);
-                thisSector.activeChunks.Add(chunk);
-
-                chunk.chunkPos = chunkPos;
-                chunk.sectorPos = sectorPos;
-                chunk.chunkSectorPos = thisSector.ChunkSectorPos(chunkPos);
-                chunk.sector = thisSector;
-
-                thisSector.chunks[chunk.chunkSectorPos.x, chunk.chunkSectorPos.y] = chunk;
-
-                chunk.InitChunk();
-                ThreadPool.QueueUserWorkItem(new WaitCallback(chunk.GenerateChunk));
-            }
-        }
-
-        generatingChunks.Clear();
-
-        // When all chunks have finished generating, we want to generate their meshes
-        while (generatingChunks.Count < activeChunks.Count)
-        {
-            foreach (Chunk chunk in activeChunks)
-            {
-                if (!generatingChunks.Contains(chunk) && chunk.isGenerated)
-                {
-                    generatingChunks.Add(chunk);
-                }
-            }
-        }
-
-        foreach (Chunk chunk in generatingChunks)
-            //StartCoroutine(chunk.GenerateMesh());
-            chunk.GenerateMesh();
-
-        generatingChunks.Clear();
-    }
-
     // Called when generating chunks
     private void GenerateChunks()
     {
@@ -172,10 +95,11 @@ public class World : MonoBehaviour
         activeChunks.Clear();
 
         // The list of chunks that need their meshes generated
-        List<Chunk> toGenerate = new List<Chunk>();
-        
-        foreach (Sector s in sectors)
-            s.activeChunks.Clear();
+        Queue<Chunk> toGenerate = new Queue<Chunk>();
+        Queue<Chunk> generatingChunks = new Queue<Chunk>();
+
+        for (int i = 0; i < sectors.Count; i++)
+            sectors[i].numActive = 0;
 
         // Looping for each chunk in render distance
         for (int x = -renderDistance + 1; x < renderDistance; x++)
@@ -186,41 +110,41 @@ public class World : MonoBehaviour
                 Vector2Int sectorPos = GetSectorPos(chunkPos);
 
                 // Making sure this chunk is in bounds and in the render distance
-                if (sectorPos.x < 0 || sectorPos.x >= worldSizeSectors || sectorPos.y < 0 || sectorPos.y >= worldSizeSectors || Vector2.Distance(playerPos, chunkPos) > renderDistance) continue;
+                if (Vector2.Distance(playerPos, chunkPos) > renderDistance || sectorPos.x < 0 || sectorPos.x >= worldSizeSectors || sectorPos.y < 0 || sectorPos.y >= worldSizeSectors) continue;
 
                 // Getting this sector this chunk belongs to
                 Sector thisSector = GetSector(sectorPos);
 
                 if (thisSector == null)
                 {
+                    bool loading = ContainsSector(this.loading, sectorPos, out thisSector);
                     if (!SaveSector.FileExists(sectorPos))
                     {
                         thisSector = new Sector(sectorPos, sectorSize);
                         sectors.Add(thisSector);
                     }
-                    else if (!ContainsSector(loading, sectorPos))
+                    else if (!loading)
                     {
                         thisSector = new Sector(sectorPos, sectorSize);
-                        loading.Add(thisSector);
+                        this.loading.Add(thisSector);
                         ThreadPool.QueueUserWorkItem(new WaitCallback(thisSector.Load));
                         thisSector.toLoad.Add(chunkPos);
                         continue;
                     }
-                }
+                    else
+                    {
+                        thisSector.toLoad.Add(chunkPos);
+                        continue;
+                    }
 
-                if (ContainsSector(loading, sectorPos, out Sector s))
-                {
-                    s.toLoad.Add(chunkPos);
-                    continue;
+                    if (deleting.Contains(thisSector)) continue;
                 }
-
-                if (deleting.Contains(thisSector)) continue;
 
                 // If the list of previously active chunks contains this chunk, move it from previously active to active
                 if (ContainsChunk(previouslyActive, chunkPos, out Chunk chunk))
                 {
                     activeChunks.Add(chunk);
-                    thisSector.activeChunks.Add(chunk);
+                    thisSector.numActive++;
                     previouslyActive.Remove(chunk);
                     continue;
                 }
@@ -233,48 +157,47 @@ public class World : MonoBehaviour
                 {
                     // Add the chunk to the list of active chunks
                     activeChunks.Add(chunk);
-                    thisSector.activeChunks.Add(chunk);
+                    thisSector.numActive++;
 
                     if (chunk.chunkObject == null)
                     {
                         chunk.chunkObject = Instantiate(chunkPrefab);
-                        generatingChunks.Add(chunk);
+                        generatingChunks.Enqueue(chunk);
                         chunk.InitChunk();
+                        continue;
                     }
 
                     chunk.chunkObject.SetActive(true);
+                    continue;
                 }
                 // If the chunk was not loaded, create a new chunk
-                else
-                {
-                    chunk = new Chunk();
-                    chunk.chunkObject = Instantiate(chunkPrefab);
+                chunk = new Chunk();
+                chunk.chunkObject = Instantiate(chunkPrefab);
                             
-                    activeChunks.Add(chunk);
-                    thisSector.activeChunks.Add(chunk);
-                    toGenerate.Add(chunk);
+                activeChunks.Add(chunk);
+                thisSector.numActive++;
+                toGenerate.Enqueue(chunk);
 
-                    chunk.chunkPos = chunkPos;
-                    chunk.sectorPos = sectorPos;
-                    chunk.chunkSectorPos = thisSector.ChunkSectorPos(chunkPos);
-                    chunk.sector = thisSector;
+                chunk.chunkPos = chunkPos;
+                chunk.sectorPos = sectorPos;
+                chunk.chunkSectorPos = thisSector.ChunkSectorPos(chunkPos);
+                chunk.sector = thisSector;
 
-                    thisSector.chunks[chunk.chunkSectorPos.x, chunk.chunkSectorPos.y] = chunk;
+                thisSector.chunks[chunk.chunkSectorPos.x, chunk.chunkSectorPos.y] = chunk;
 
-                    chunk.InitChunk();
-                    ThreadPool.QueueUserWorkItem(new WaitCallback(chunk.GenerateChunk));
-                }
+                chunk.InitChunk();
+                ThreadPool.QueueUserWorkItem(new WaitCallback(chunk.GenerateChunk));
             } 
         }
 
         // All chunks left in previously active are disabled
-        foreach (Chunk chunk in previouslyActive)
-            chunk.chunkObject.SetActive(false);
+        for (int i = 0; i < previouslyActive.Count; i++)
+            previouslyActive[i].chunkObject.SetActive(false);
 
         for (int i = 0; i < sectors.Count; i++)
         {
             Sector s = sectors[i];
-            if (s.activeChunks.Count == 0)
+            if (s.numActive == 0)
             {
                 sectors.Remove(s);
                 deleting.Add(s);
@@ -284,76 +207,92 @@ public class World : MonoBehaviour
 
         // Generating the meshes for all chunks
         while (toGenerate.Count > 0)
-        {
-            for (int i = 0; i < toGenerate.Count; i++)
-            {
-                if (toGenerate[i].isGenerated)
-                {
-                    generatingChunks.Add(toGenerate[i]);
-                    toGenerate.RemoveAt(i);
-                }
-            }
-        }
+            if (toGenerate.Peek().isGenerated)
+                generatingChunks.Enqueue(toGenerate.Dequeue());
 
-        foreach (Chunk chunk in generatingChunks)
+        while (generatingChunks.Count > 0)
         {
-            chunk.meshGenerated = true;
-            chunk.GenerateMesh();
-            chunk.UpdateSurroundingChunks();
+            Chunk chunk = generatingChunks.Dequeue();
+            StartCoroutine(chunk.GenerateMesh());
+            //StartCoroutine(chunk.UpdateSurroundingChunks());
         }
+    }
 
-        generatingChunks.Clear();
+    public byte GetBlock(Vector3Int pos)
+    {
+        if (pos.x < 0 || pos.z < 0 || pos.y < 0 || pos.x == worldSizeBlocks || pos.z == worldSizeBlocks || pos.y == chunkSize.y) return 0;
+
+        Sector? sector = GetSector(pos);
+        Chunk? chunk = sector == null ? null : sector.GetChunk(pos);
+
+        return chunk == null ? (byte)0 : chunk.GetBlock(pos);
+    }
+    private Sector GetSector(Vector3Int pos)
+    {
+        Vector2Int sectorPos = new Vector2Int(pos.x / chunkSize.x / sectorSize, pos.z / chunkSize.x / sectorSize);
+
+        for (int i = 0; i < sectors.Count; i++)
+            if (sectors[i].sectorPos == sectorPos)
+                return sectors[i];
+
+        return null;
     }
 
     // Returns true and the chunk object if the chunk with the coordinates exists in the list
     private static bool ContainsChunk(List<Chunk> chunks, Vector2Int chunkPos, out Chunk outChunk)
     {
-        foreach (Chunk chunk in chunks)
-            if (chunk.chunkPos == chunkPos)
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            if (chunks[i].chunkPos == chunkPos)
             {
-                outChunk = chunk;
+                outChunk = chunks[i];
                 return true;
             }
+        }
         outChunk = null;
         return false;
     }
-
-    public Chunk GetChunkFromSector(Sector sector, Vector2Int chunkPos)
+    public static Chunk GetChunkFromSector(Sector sector, Vector2Int chunkPos)
     {
         Vector2Int csp = sector.ChunkSectorPos(chunkPos);
         return sector.chunks[csp.x, csp.y];
     }
-
     public static Vector2Int GetSectorPos(Vector2Int chunkPos)
     {
         return chunkPos / sectorSize;
     }
-
     public Sector GetSector(Vector2Int sectorPos)
     {
-        foreach (Sector s in sectors)
-            if (s.sectorPos == sectorPos)
-                return s;
+        for (int i = 0; i < sectors.Count; i++)
+        {
+            if (sectors[i].sectorPos == sectorPos)
+            {
+                return sectors[i];
+            }
+        }
         return null;
     }
-
-    public bool ContainsSector(List<Sector> sectors, Vector2Int sectorPos)
+    public static bool ContainsSector(List<Sector> sectors, Vector2Int sectorPos, out Sector sector)
     {
-        foreach (Sector s in sectors)
-            if (s.sectorPos == sectorPos)
+        sector = null;
+        for (int i = 0; i < sectors.Count; i++)
+        {
+            if (sectors[i].sectorPos == sectorPos)
+            {
+                sector = sectors[i];
                 return true;
+            }
+        }
         return false;
     }
 
-    public bool ContainsSector(List<Sector> sectors, Vector2Int sectorPos, out Sector sector)
+    public Sector GetSectorFromChunkPos(Vector2Int chunkPos)
     {
-        sector = null;
-        foreach (Sector s in sectors)
-            if (s.sectorPos == sectorPos)
-            {
-                sector = s;
-                return true;
-            }
-        return false;
+        Vector2Int sectorPos = chunkPos / sectorSize;
+
+        for (int i = 0; i < sectors.Count; i++)
+            if (sectors[i].sectorPos == sectorPos)
+                return sectors[i];
+        return null;
     }
 }

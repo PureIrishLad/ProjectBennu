@@ -9,7 +9,7 @@ public class Sector
     public Vector2Int sectorPos;
     private int sectorSize;
 
-    public List<Chunk> activeChunks;
+    public int numActive;
     public List<Vector2Int> toLoad;
     public bool deleted = false;
     public bool loaded = false;
@@ -19,13 +19,31 @@ public class Sector
         chunks = new Chunk[sectorSize, sectorSize];
         this.sectorPos = sectorPos;
         this.sectorSize = sectorSize;
-        activeChunks = new List<Chunk>();
+        numActive = 0;
         toLoad = new List<Vector2Int>();
     }
 
     public Vector2Int ChunkSectorPos(Vector2Int chunkPos)
     {
         return new Vector2Int(Utility.Modulo(chunkPos.x, sectorSize), Utility.Modulo(chunkPos.y, sectorSize));
+    }
+
+    public Chunk GetChunk(Vector3Int pos)
+    {
+        Vector2Int posV2 = new Vector2Int(pos.x, pos.z);
+        Vector2Int chunkPos = new Vector2Int(posV2.x / World.chunkSize.x, posV2.y / World.chunkSize.x);
+
+        if (chunkPos.x == World.worldSizeChunks || chunkPos.y == World.worldSizeChunks) return null;
+
+        Vector2Int chunkSectorPos = new Vector2Int(chunkPos.x % World.sectorSize, chunkPos.y % World.sectorSize);
+
+        return chunks[chunkSectorPos.x, chunkSectorPos.y];
+    }
+    public Chunk GetChunk(Vector2Int chunkPos)
+    {
+        if (chunkPos.x < 0 || chunkPos.y < 0) return null;
+        Vector2Int csp = new Vector2Int(chunkPos.x % sectorSize, chunkPos.y % sectorSize);
+        return chunks[csp.x, csp.y];
     }
 
     public void LoadChunks()
@@ -41,7 +59,7 @@ public class Sector
 
             chunk.chunkObject = go;
             chunk.InitChunk();
-            chunk.GenerateMesh();
+            chunk.GenerateMeshNC();
         }
 
         toLoad.Clear();
@@ -57,12 +75,6 @@ public class Sector
     public void Unload(object obj)
     {
         SaveSector.Save(this);
-
-        foreach (Chunk chunk in chunks)
-            if (chunk != null)
-                Object.Destroy(chunk.chunkObject);
-
-        chunks = new Chunk[0, 0];
 
         deleted = true;
     }
