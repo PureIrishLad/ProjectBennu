@@ -5,7 +5,7 @@ using System.Threading;
 
 public class World : MonoBehaviour
 {
-    public static int worldSizeSectors = 12;
+    public static int worldSizeSectors = 229;
     public static int sectorSize = 64; // The size of each sector in chunks
     public static int worldSizeChunks = worldSizeSectors * sectorSize;
     public static int worldSizeBlocks = worldSizeChunks * chunkSize.x;
@@ -45,7 +45,8 @@ public class World : MonoBehaviour
         player.sectorPos = new Vector2Int(worldSizeSectors / 2, worldSizeSectors / 2);
         player.chunkPos = player.sectorPos * sectorSize;
         //playerPrevPos = player.chunkPos;
-        player.transform.position = new Vector3(player.chunkPos.x * chunkSize.x, chunkSize.y / 2, player.chunkPos.y * chunkSize.x);
+        player.transform.position = new Vector3(2000, 0, 2000);
+        player.GetComponent<Player>().position = new Vector3(player.chunkPos.x * chunkSize.x, chunkSize.y / 2, player.chunkPos.y * chunkSize.x);
 
         int threads = System.Environment.ProcessorCount;
         chunkPrefabS = chunkPrefab;
@@ -222,10 +223,19 @@ public class World : MonoBehaviour
     {
         if (pos.x < 0 || pos.z < 0 || pos.y < 0 || pos.x == worldSizeBlocks || pos.z == worldSizeBlocks || pos.y == chunkSize.y) return 0;
 
-        Sector? sector = GetSector(pos);
-        Chunk? chunk = sector == null ? null : sector.GetChunk(pos);
+        Sector sector = GetSector(pos);
+        Chunk chunk = sector == null ? null : sector.GetChunk(pos);
 
         return chunk == null ? (byte)0 : chunk.GetBlock(pos);
+    }
+    public void SetBlock(Vector3Int pos, byte blockID)
+    {
+        if (pos.x < 0 || pos.z < 0 || pos.y < 0 || pos.x == worldSizeBlocks || pos.z == worldSizeBlocks || pos.y == chunkSize.y) return;
+
+        Sector sector = GetSector(pos);
+        Chunk chunk = sector == null ? null : sector.GetChunk(pos);
+
+        if (chunk != null) chunk.SetBlock(pos, blockID);
     }
     private Sector GetSector(Vector3Int pos)
     {

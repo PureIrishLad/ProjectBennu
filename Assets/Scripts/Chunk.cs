@@ -45,6 +45,8 @@ public class Chunk
 
     }; // Uvs for each block
 
+    private float uvOffset = 1 / 16f;
+
     private List<Vector3> verts = new List<Vector3>();
     private List<Vector2> uvs = new List<Vector2>();
     private List<int> indices = new List<int>();
@@ -89,7 +91,7 @@ public class Chunk
                 {
                     float value = Noise.CalcPixel3D(offX, y, z + offset.z, scale) * bias2;
 
-                    data[x, y, z] = value >= 241 ? (byte)1 : (byte)0;
+                    data[x, y, z] = value >= 241 ? (value >= 248 ? (byte)2: (byte)1) : (byte)0;
                 }
 
             }
@@ -132,6 +134,16 @@ public class Chunk
                     // We ignore this block if it is void
                     if (data[x, y, z] == 0) continue;
 
+                    Vector2 uvStart = new Vector2(data[x, y, z] % 16 / 16.0f, ((int)(data[x, y, z] / 16.0f)) / 16.0f);
+
+                    Vector2[] uvs2 = new Vector2[4]
+                    {
+                        new Vector2(uvStart.x, uvStart.y - uvOffset),
+                        new Vector2(uvStart.x + uvOffset, uvStart.y - uvOffset),
+                        new Vector2(uvStart.x + uvOffset, uvStart.y),
+                        uvStart
+                    };
+
                     // Testing the position of this block to see which faces can be drawn
                     localPos.y = y;
                     worldPos.y = y;
@@ -156,7 +168,7 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[0], vertices[1], vertices[2], vertices[3] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
@@ -166,7 +178,7 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[4], vertices[5], vertices[6], vertices[7] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
@@ -176,7 +188,7 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[5], vertices[0], vertices[3], vertices[6] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
@@ -186,7 +198,7 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[1], vertices[4], vertices[7], vertices[2] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
@@ -196,7 +208,7 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[3], vertices[2], vertices[7], vertices[6] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
@@ -207,16 +219,17 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[5], vertices[4], vertices[1], vertices[0] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
                         i += 4;
                     }
-
                 }
             }
         }
+
+        meshGenerated = true;
 
         mesh.vertices = verts.ToArray();
         mesh.SetIndices(indices.ToArray(), MeshTopology.Triangles, 0);
@@ -238,7 +251,7 @@ public class Chunk
 
         }
 
-        mesh.vertices = verts.ToArray();
+        mesh.SetVertices(verts.ToArray());
         mesh.SetIndices(indices.ToArray(), MeshTopology.Triangles, 0);
         mesh.SetUVs(0, uvs.ToArray());
 
@@ -302,6 +315,20 @@ public class Chunk
         return data[relative.x, relative.y, relative.z];
     }
 
+    public void SetBlock(Vector3Int pos, byte blockID)
+    {
+        if (pos.x < 0 || pos.z < 0) return;
+        Vector3Int relative = new Vector3Int(pos.x % World.chunkSize.x, pos.y, pos.z % World.chunkSize.x);
+        data[relative.x, relative.y, relative.z] = blockID;
+
+        mesh.Clear();
+        verts.Clear();
+        indices.Clear();
+        uvs.Clear();
+
+        GenerateMeshNC();
+    }
+
     public void GenerateMeshPar(object obj)
     {
         Vector3Int localPos = new Vector3Int();
@@ -333,6 +360,16 @@ public class Chunk
                     // We ignore this block if it is void
                     if (data[x, y, z] == 0) continue;
 
+                    Vector2 uvStart = new Vector2(data[x, y, z] % 16 / 16.0f, ((int)(data[x, y, z] / 16.0f)) / 16.0f);
+
+                    Vector2[] uvs2 = new Vector2[4]
+                    {
+                        new Vector2(uvStart.x, uvStart.y - uvOffset),
+                        new Vector2(uvStart.x + uvOffset, uvStart.y - uvOffset),
+                        new Vector2(uvStart.x + uvOffset, uvStart.y),
+                        uvStart
+                    };
+
                     // Testing the position of this block to see which faces can be drawn
                     localPos.y = y;
                     worldPos.y = y;
@@ -357,7 +394,7 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[0], vertices[1], vertices[2], vertices[3] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
@@ -367,7 +404,7 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[4], vertices[5], vertices[6], vertices[7] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
@@ -377,7 +414,7 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[5], vertices[0], vertices[3], vertices[6] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
@@ -387,7 +424,7 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[1], vertices[4], vertices[7], vertices[2] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
@@ -397,7 +434,7 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[3], vertices[2], vertices[7], vertices[6] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
@@ -408,7 +445,7 @@ public class Chunk
                     {
                         verts.AddRange(new Vector3[4] { vertices[5], vertices[4], vertices[1], vertices[0] });
 
-                        uvs.AddRange(uvsA);
+                        uvs.AddRange(uvs2);
 
                         indices.AddRange(new int[6] { i, i + 3, i + 1, i + 1, i + 3, i + 2 });
 
