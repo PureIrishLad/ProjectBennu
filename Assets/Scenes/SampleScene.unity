@@ -152,7 +152,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b178011c98515e4b9df79b572e5a787, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  renderDistance: 16
+  renderDistance: 8
   noiseScale: 0.025
   chunkPrefab: {fileID: 1012426361099789162, guid: 15c5ae4ce9b88e84aaed26acdf16f15e, type: 3}
   asteroidYBias: 128

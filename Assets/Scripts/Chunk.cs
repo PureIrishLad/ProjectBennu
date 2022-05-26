@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using SimplexNoise;
+using System.Threading;
 
 public class Chunk
 {
@@ -229,6 +230,80 @@ public class Chunk
     {
         mesh.Clear();
 
+        ThreadPool.QueueUserWorkItem(new WaitCallback(GenerateMeshPar));
+
+        // What the fuck
+        while (!meshGenerated)
+        {
+
+        }
+
+        mesh.vertices = verts.ToArray();
+        mesh.SetIndices(indices.ToArray(), MeshTopology.Triangles, 0);
+        mesh.SetUVs(0, uvs.ToArray());
+
+        mesh.RecalculateBounds();
+        mesh.RecalculateNormals();
+
+        yield return null;
+    }
+
+    // Tests the given block position to see which faces can be drawn
+
+    public byte TestPos(Vector3Int pos)
+    {
+        byte flags = 0x00;
+
+        Vector3Int up = pos + Vector3Int.up;
+        Vector3Int down = pos + Vector3Int.down;
+        Vector3Int left = pos + Vector3Int.left;
+        Vector3Int right = pos + Vector3Int.right;
+        Vector3Int forward = pos + Vector3Int.forward;
+        Vector3Int back = pos + Vector3Int.back;
+
+        flags += world.GetBlock(back) == 0 ? (byte)0x01 : (byte)0;
+        flags += world.GetBlock(forward) == 0 ? (byte)0x02 : (byte)0;
+        flags += world.GetBlock(left) == 0 ? (byte)0x04 : (byte)0;
+        flags += world.GetBlock(right) == 0 ? (byte)0x08 : (byte)0;
+        flags += world.GetBlock(up) == 0 ? (byte)0x10 : (byte)0;
+        flags += world.GetBlock(down) == 0 ? (byte)0x20 : (byte)0;
+
+        return flags;
+    }
+
+    public IEnumerator UpdateSurroundingChunks()
+    {
+        for (int x = -1; x < 2; x++)
+        {
+            for (int z = -1; z < 2; z++)
+            {
+                if (Mathf.Abs(x) == Mathf.Abs(z)) continue;
+
+                Vector2Int chunkPos = new Vector2Int(x, z) + this.chunkPos;
+                Sector sector = world.GetSectorFromChunkPos(chunkPos);
+
+                if (sector == null) continue;
+
+                Chunk chunk = sector.GetChunk(chunkPos);
+
+                if (chunk != null && chunk.meshGenerated)
+                    chunk.GenerateMeshNC();
+            }
+        }
+
+        yield return null;
+    }
+
+    public byte GetBlock(Vector3Int pos)
+    {
+        if (pos.x < 0 || pos.z < 0) return 0;
+        Vector3Int relative = new Vector3Int(pos.x % World.chunkSize.x, pos.y, pos.z % World.chunkSize.x);
+
+        return data[relative.x, relative.y, relative.z];
+    }
+
+    public void GenerateMeshPar(object obj)
+    {
         Vector3Int localPos = new Vector3Int();
         Vector3Int worldPos = new Vector3Int();
         byte faces;
@@ -339,75 +414,11 @@ public class Chunk
 
                         i += 4;
                     }
-
                 }
             }
         }
 
         meshGenerated = true;
-
-        mesh.vertices = verts.ToArray();
-        mesh.SetIndices(indices.ToArray(), MeshTopology.Triangles, 0);
-        mesh.SetUVs(0, uvs.ToArray());
-
-        mesh.RecalculateBounds();
-        mesh.RecalculateNormals();
-
-        yield return null;
-    }
-
-    // Tests the given block position to see which faces can be drawn
-
-    public byte TestPos(Vector3Int pos)
-    {
-        byte flags = 0x00;
-
-        Vector3Int up = pos + Vector3Int.up;
-        Vector3Int down = pos + Vector3Int.down;
-        Vector3Int left = pos + Vector3Int.left;
-        Vector3Int right = pos + Vector3Int.right;
-        Vector3Int forward = pos + Vector3Int.forward;
-        Vector3Int back = pos + Vector3Int.back;
-
-        flags += world.GetBlock(back) == 0 ? (byte)0x01 : (byte)0;
-        flags += world.GetBlock(forward) == 0 ? (byte)0x02 : (byte)0;
-        flags += world.GetBlock(left) == 0 ? (byte)0x04 : (byte)0;
-        flags += world.GetBlock(right) == 0 ? (byte)0x08 : (byte)0;
-        flags += world.GetBlock(up) == 0 ? (byte)0x10 : (byte)0;
-        flags += world.GetBlock(down) == 0 ? (byte)0x20 : (byte)0;
-
-        return flags;
-    }
-
-    public IEnumerator UpdateSurroundingChunks()
-    {
-        for (int x = -1; x < 2; x++)
-        {
-            for (int z = -1; z < 2; z++)
-            {
-                if (Mathf.Abs(x) == Mathf.Abs(z)) continue;
-
-                Vector2Int chunkPos = new Vector2Int(x, z) + this.chunkPos;
-                Sector sector = world.GetSectorFromChunkPos(chunkPos);
-
-                if (sector == null) continue;
-
-                Chunk chunk = sector.GetChunk(chunkPos);
-
-                if (chunk != null && chunk.meshGenerated)
-                    chunk.GenerateMeshNC();
-            }
-        }
-
-        yield return null;
-    }
-
-    public byte GetBlock(Vector3Int pos)
-    {
-        if (pos.x < 0 || pos.z < 0) return 0;
-        Vector3Int relative = new Vector3Int(pos.x % World.chunkSize.x, pos.y, pos.z % World.chunkSize.x);
-
-        return data[relative.x, relative.y, relative.z];
     }
 }
 
